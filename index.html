@@ -425,18 +425,36 @@
               <!-- Nome do local — coluna "name" na tabela "locais" -->
               <input id="newLocation" type="text" placeholder="Nome do local (ex.: Cantina)" required>
               <!-- Tipo do local — coluna "type" na tabela "locais" -->
-              <select id="locationType">
-                <option value="Instituição de ensino">Instituição de ensino</option>
-                <option value="Residência">Residência</option>
-              </select>
+              <select id="locationType"></select>
               <button class="primary-btn" type="submit">＋ Adicionar</button>
               <button class="secondary-btn" type="button" id="cancelEditLocation" style="display:none">Cancelar</button>
             </form>
           </article>
 
-          <!-- Cards dos locais cadastrados — gerados por renderLocations() em app.js
-               Cada card exibe nome, tipo, total de kg e quantidade de pesagens -->
+          <!-- Cards dos locais cadastrados -->
           <div id="locationCards" class="location-cards"></div>
+
+          <!-- Gestão de Ambientes -->
+          <div class="page-header" style="margin-top:32px">
+            <div>
+              <h1 style="font-size:20px">Ambientes</h1>
+              <p>Gerencie os tipos de ambiente dos locais de coleta.</p>
+            </div>
+          </div>
+
+          <article class="panel">
+            <form id="ambienteForm" class="location-form">
+              <input id="newAmbiente" type="text" placeholder="Nome do ambiente (ex.: Escola)" required>
+              <button class="primary-btn" type="submit">＋ Adicionar</button>
+              <button class="secondary-btn" type="button" id="cancelEditAmbiente" style="display:none">Cancelar</button>
+            </form>
+            <div class="table-wrap" style="margin-top:16px">
+              <table>
+                <thead><tr><th>Ambiente</th><th>Ações</th></tr></thead>
+                <tbody id="ambientesTable"></tbody>
+              </table>
+            </div>
+          </article>
         </section>
 
         <!-- ============================================================

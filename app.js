@@ -12,6 +12,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Carregados uma vez ao iniciar via fetchAll(), depois atualizados localmente
 // ============================================================
 let locations = [];
+let ambientes = [];
 let data = [];
 
 // ============================================================
@@ -27,16 +28,19 @@ const colors = {
 // Carrega locais e pesagens ao abrir o app
 // ============================================================
 async function fetchAll() {
-  const [{ data: locs }, { data: pesagens }] = await Promise.all([
+  const [{ data: locs }, { data: pesagens }, { data: ambs }] = await Promise.all([
     db.from("locais").select("*").order("name"),
-    db.from("pesagens").select("*").order("date", { ascending: false })
+    db.from("pesagens").select("*").order("date", { ascending: false }),
+    db.from("ambientes").select("*").order("name")
   ]);
   locations = locs || [];
-  // Mapeia location_id para locationId para manter compatibilidade com o restante do código
+  ambientes = ambs || [];
   data = (pesagens || []).map(x => ({ ...x, locationId: x.location_id }));
   populateLocationSelects();
+  populateAmbienteSelects();
   renderDashboard();
   renderLocations();
+  renderAmbientes();
 }
 
 // ============================================================
@@ -291,6 +295,50 @@ function renderHistory() {
 }
 
 // ============================================================
+// AMBIENTES — renderiza tabela e popula selects
+// ============================================================
+function populateAmbienteSelects() {
+  const sel = document.getElementById("locationType");
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = ambientes.map(a => `<option value="${a.name}">${a.name}</option>`).join("");
+  if ([...sel.options].some(o => o.value === current)) sel.value = current;
+}
+
+function renderAmbientes() {
+  const tbody = document.getElementById("ambientesTable");
+  if (!tbody) return;
+  tbody.innerHTML = ambientes.length
+    ? ambientes.map(a => `<tr>
+        <td>${a.name}</td>
+        <td>
+          <button class="action-btn edit-btn" data-edit-amb="${a.id}">Editar</button>
+          <button class="action-btn" data-delete-amb="${a.id}">Excluir</button>
+        </td>
+      </tr>`).join("")
+    : `<tr><td colspan="2" class="empty">Nenhum ambiente cadastrado.</td></tr>`;
+}
+
+function openEditAmbiente(id) {
+  const amb = ambientes.find(a => a.id === id);
+  if (!amb) return;
+  const form = document.getElementById("ambienteForm");
+  document.getElementById("newAmbiente").value = amb.name;
+  form.dataset.editId = id;
+  form.querySelector("button[type=submit]").textContent = "💾 Salvar alterações";
+  document.getElementById("cancelEditAmbiente").style.display = "";
+  document.getElementById("newAmbiente").focus();
+}
+
+function resetAmbienteForm() {
+  const form = document.getElementById("ambienteForm");
+  form.reset();
+  delete form.dataset.editId;
+  form.querySelector("button[type=submit]").textContent = "＋ Adicionar";
+  document.getElementById("cancelEditAmbiente").style.display = "none";
+}
+
+// ============================================================
 // CARDS DE LOCAIS DE COLETA
 // ============================================================
 function renderLocations() {
@@ -389,7 +437,7 @@ document.addEventListener("click", e => {
     }
   }
 
-  // Clique em editar local — preenche o formulário com os dados do local
+  // Clique em editar local
   const edit = e.target.closest("[data-edit-id]");
   if (edit) openEditLocation(edit.dataset.editId);
 
@@ -407,6 +455,29 @@ document.addEventListener("click", e => {
         populateLocationSelects();
         renderLocations();
         showToast("Local excluído.");
+      });
+    }
+  }
+
+  // Clique em editar ambiente
+  const editAmb = e.target.closest("[data-edit-amb]");
+  if (editAmb) openEditAmbiente(editAmb.dataset.editAmb);
+
+  // Clique em excluir ambiente
+  const delAmb = e.target.closest("[data-delete-amb]");
+  if (delAmb) {
+    const id = delAmb.dataset.deleteAmb;
+    const amb = ambientes.find(a => a.id === id);
+    if (locations.some(l => l.type === amb?.name)) {
+      showToast("Remova os locais deste ambiente antes de excluí-lo.");
+      return;
+    }
+    if (confirm("Excluir este ambiente?")) {
+      db.from("ambientes").delete().eq("id", id).then(() => {
+        ambientes = ambientes.filter(a => a.id !== id);
+        populateAmbienteSelects();
+        renderAmbientes();
+        showToast("Ambiente excluído.");
       });
     }
   }
@@ -496,6 +567,35 @@ document.getElementById("locationForm").addEventListener("submit", async e => {
 });
 
 document.getElementById("cancelEditLocation").addEventListener("click", resetLocationForm);
+
+// ============================================================
+// FORMULÁRIO DE AMBIENTE — INSERT ou UPDATE no Supabase
+// ============================================================
+document.getElementById("ambienteForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name   = document.getElementById("newAmbiente").value.trim();
+  const editId = e.target.dataset.editId;
+  if (!name) return;
+
+  if (editId) {
+    const { error } = await db.from("ambientes").update({ name }).eq("id", editId);
+    if (error) { showToast("Erro ao atualizar ambiente."); return; }
+    const amb = ambientes.find(a => a.id === editId);
+    if (amb) amb.name = name;
+    showToast("Ambiente atualizado.");
+  } else {
+    const { data: inserted, error } = await db.from("ambientes").insert([{ name }]).select().single();
+    if (error) { showToast("Erro ao salvar ambiente."); return; }
+    ambientes.push(inserted);
+    showToast("Ambiente adicionado.");
+  }
+
+  resetAmbienteForm();
+  populateAmbienteSelects();
+  renderAmbientes();
+});
+
+document.getElementById("cancelEditAmbiente").addEventListener("click", resetAmbienteForm);
 document.getElementById("exportCsv").addEventListener("click", exportCsv);
 
 // ============================================================
