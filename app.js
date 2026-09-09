@@ -390,7 +390,7 @@ function resetLocationForm() {
 // EXPORTAÇÃO CSV — 4 tipos de relatório
 // ============================================================
 function csvDownload(filename, rows) {
-  const csv  = rows.map(r => r.map(v => `"${String(v ?? "").replaceAll('"','""')}"`).join(";")).join("\n");
+  const csv  = "sep=;\n" + rows.map(r => r.map(v => `"${String(v ?? "").replaceAll('"','""')}"`).join(";")).join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
   const a    = document.createElement("a");
   a.href     = URL.createObjectURL(blob);
