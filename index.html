@@ -426,10 +426,11 @@
               <input id="newLocation" type="text" placeholder="Nome do local (ex.: Cantina)" required>
               <!-- Tipo do local — coluna "type" na tabela "locais" -->
               <select id="locationType">
-                <option>Instituição de ensino</option>
-                <option>Residência</option>
+                <option value="Instituição de ensino">Instituição de ensino</option>
+                <option value="Residência">Residência</option>
               </select>
               <button class="primary-btn" type="submit">＋ Adicionar</button>
+              <button class="secondary-btn" type="button" id="cancelEditLocation" style="display:none">Cancelar</button>
             </form>
           </article>
 

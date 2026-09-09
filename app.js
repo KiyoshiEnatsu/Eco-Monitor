@@ -324,6 +324,7 @@ function openEditLocation(id) {
   document.getElementById("locationType").value = loc.type;
   form.dataset.editId = id;
   form.querySelector("button[type=submit]").textContent = "💾 Salvar alterações";
+  document.getElementById("cancelEditLocation").style.display = "";
   document.getElementById("newLocation").focus();
 }
 
@@ -333,6 +334,7 @@ function resetLocationForm() {
   form.reset();
   delete form.dataset.editId;
   form.querySelector("button[type=submit]").textContent = "＋ Adicionar";
+  document.getElementById("cancelEditLocation").style.display = "none";
 }
 
 // ============================================================
@@ -493,6 +495,7 @@ document.getElementById("locationForm").addEventListener("submit", async e => {
   renderLocations();
 });
 
+document.getElementById("cancelEditLocation").addEventListener("click", resetLocationForm);
 document.getElementById("exportCsv").addEventListener("click", exportCsv);
 
 // ============================================================
