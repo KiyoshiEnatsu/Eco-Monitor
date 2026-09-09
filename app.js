@@ -419,10 +419,10 @@ async function xlsxDownload(filename, rows) {
         : { color: { argb: INK }, size: 10, name: "Calibri" };
       cell.alignment = { vertical: "middle", horizontal: isHeader ? "center" : "left", wrapText: false };
       cell.border = {
-        top:    { style: "thin", color: { argb: LINE } },
-        bottom: { style: "thin", color: { argb: LINE } },
-        left:   { style: "thin", color: { argb: LINE } },
-        right:  { style: "thin", color: { argb: LINE } }
+        top:    { style: "thin", color: { argb: "FF000000" } },
+        bottom: { style: "thin", color: { argb: "FF000000" } },
+        left:   { style: "thin", color: { argb: "FF000000" } },
+        right:  { style: "thin", color: { argb: "FF000000" } }
       };
     });
   });
