@@ -1,73 +1,21 @@
 // ============================================================
-// CHAVES DO LOCALSTORAGE
-// Ao migrar para Supabase, estas constantes deixam de ser usadas.
-// Os dados passarão a vir das tabelas: "pesagens" e "locais".
+// CONFIGURAÇÃO DO SUPABASE
+// URL e chave pública do projeto — não compartilhe a service_role key
 // ============================================================
-const STORAGE_KEY = "ecomonitor_data_v1";   // chave para pesagens no localStorage
-const LOC_KEY = "ecomonitor_locations_v1";  // chave para locais no localStorage
+const SUPABASE_URL = "https://wjqodofpfycxyewmbzvk.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqcW9kb2ZwZnljeHlld21ienZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NjE2ODYsImV4cCI6MjA5NTQzNzY4Nn0.Emvqq_vElule8SvA4g2HILMSb2iFUyknNEjhuPWP-s0";
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ============================================================
-// LOCAIS PADRÃO
-// No Supabase: tabela "locais" com colunas id (uuid), name (text), type (text).
-// Substituir por: const { data: locations } = await supabase.from("locais").select("*")
+// DADOS EM MEMÓRIA
+// Carregados uma vez ao iniciar via fetchAll(), depois atualizados localmente
 // ============================================================
-const defaultLocations = [
-  { id: "loc1", name: "Cantina",        type: "Instituição de ensino" },
-  { id: "loc2", name: "Sala 101",       type: "Instituição de ensino" },
-  { id: "loc3", name: "Administrativo", type: "Instituição de ensino" },
-  { id: "loc4", name: "Quadra",         type: "Instituição de ensino" },
-  { id: "loc5", name: "Biblioteca",     type: "Instituição de ensino" }
-];
+let locations = [];
+let data = [];
 
 // ============================================================
-// DADOS DE EXEMPLO (seed)
-// No Supabase: inserir via painel ou migration SQL.
-// Formato da tabela "pesagens": id, date, location_id, type, weight, destination, notes
-// ============================================================
-const sampleData = [
-  ["2026-09-08","loc1","Orgânico",12.5,"Compostagem"],
-  ["2026-09-07","loc2","Plástico",8.3,"Reciclagem"],
-  ["2026-09-06","loc3","Papel",6.7,"Reciclagem"],
-  ["2026-09-05","loc4","Metal",4.2,"Reciclagem"],
-  ["2026-09-04","loc1","Vidro",3.8,"Reciclagem"],
-  ["2026-09-03","loc1","Orgânico",11.1,"Compostagem"],
-  ["2026-09-02","loc2","Plástico",7.4,"Reciclagem"],
-  ["2026-09-01","loc3","Papel",5.9,"Reciclagem"],
-  ["2026-08-29","loc5","Rejeitos",4.1,"Aterro / rejeito"],
-  ["2026-08-28","loc4","Vidro",3.4,"Reciclagem"],
-  ["2026-08-27","loc1","Plástico",9.2,"Reciclagem"],
-  ["2026-08-26","loc2","Orgânico",10.6,"Compostagem"],
-  ["2026-08-25","loc3","Metal",5.0,"Reciclagem"],
-  ["2026-08-23","loc1","Papel",7.3,"Reciclagem"],
-  ["2026-08-22","loc5","Orgânico",9.8,"Compostagem"],
-];
-
-// ============================================================
-// INICIALIZAÇÃO DOS DADOS EM MEMÓRIA
-// No Supabase: substituir por chamadas assíncronas ao iniciar o app.
-// Ex.: let locations = await fetchLocations()
-//      let data = await fetchPesagens()
-// ============================================================
-let locations = JSON.parse(localStorage.getItem(LOC_KEY) || "null") || defaultLocations;
-let data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-
-// Se não houver dados salvos, popula com os dados de exemplo
-if (!data) {
-  data = sampleData.map((r,i) => ({
-    id: String(i+1),
-    date: r[0],
-    locationId: r[1],  // no Supabase: location_id (FK para tabela locais)
-    type: r[2],
-    weight: r[3],
-    destination: r[4],
-    notes: ""
-  }));
-  saveData();
-}
-
-// ============================================================
-// MAPA DE CORES POR TIPO DE RESÍDUO
-// Usado apenas no front-end, não precisa ir para o banco.
+// MAPA DE CORES POR TIPO DE RESÍDUO — apenas front-end
 // ============================================================
 const colors = {
   "Orgânico":"#15966a", "Plástico":"#3577db", "Papel":"#f1a421",
@@ -75,144 +23,110 @@ const colors = {
 };
 
 // ============================================================
-// FUNÇÕES DE PERSISTÊNCIA
-// No Supabase: substituir saveData() por INSERT/UPDATE na tabela "pesagens"
-// e saveLocations() por INSERT/UPDATE na tabela "locais".
+// BUSCA INICIAL DE DADOS NO SUPABASE
+// Carrega locais e pesagens ao abrir o app
 // ============================================================
-
-// Salva array de pesagens no localStorage
-function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-// Salva array de locais no localStorage
-function saveLocations() {
-  localStorage.setItem(LOC_KEY, JSON.stringify(locations));
+async function fetchAll() {
+  const [{ data: locs }, { data: pesagens }] = await Promise.all([
+    db.from("locais").select("*").order("name"),
+    db.from("pesagens").select("*").order("date", { ascending: false })
+  ]);
+  locations = locs || [];
+  // Mapeia location_id para locationId para manter compatibilidade com o restante do código
+  data = (pesagens || []).map(x => ({ ...x, locationId: x.location_id }));
+  populateLocationSelects();
+  renderDashboard();
+  renderLocations();
 }
 
 // ============================================================
 // FUNÇÕES UTILITÁRIAS DE FORMATAÇÃO
-// Independentes do banco — permanecem iguais após migração.
 // ============================================================
-
-// Formata número como "X,X kg" em pt-BR
 function kg(n) {
   return `${Number(n).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1})} kg`;
 }
-
-// Formata número como porcentagem em pt-BR
 function pct(n) {
   return `${Number(n).toLocaleString("pt-BR",{maximumFractionDigits:1})}%`;
 }
-
-// Retorna o nome do local pelo ID
-// No Supabase: o JOIN na query já trará o nome diretamente
 function getLocation(id) {
   return locations.find(l => l.id === id)?.name || "Local removido";
 }
-
-// Converte string "YYYY-MM-DD" para data formatada em pt-BR
 function formatDate(s) {
   return new Date(s+"T12:00:00").toLocaleDateString("pt-BR");
 }
-
-// Exibe uma notificação temporária (toast) na tela
 function showToast(msg) {
   const el = document.getElementById("toast");
   el.textContent = msg;
   el.classList.add("show");
   setTimeout(() => el.classList.remove("show"), 2200);
 }
-
-// Gera HTML de uma tag colorida para o tipo de resíduo
 function typeTag(type) {
   const map = { Orgânico:"green", Plástico:"blue", Papel:"yellow", Metal:"gray", Vidro:"cyan", Rejeitos:"red" };
   return `<span class="tag ${map[type]||"gray"}">${type}</span>`;
 }
-
-// Gera HTML de uma tag colorida para a destinação
 function destinationTag(d) {
   return `<span class="tag ${d==="Reciclagem"||d==="Compostagem"?"green":d==="Aterro / rejeito"?"red":"gray"}">${d}</span>`;
 }
 
 // ============================================================
 // POPULAÇÃO DOS SELECTS DE LOCAL
-// No Supabase: buscar locais com supabase.from("locais").select("*")
-// e popular os selects com o resultado.
 // ============================================================
 function populateLocationSelects() {
   const selects = [
-    document.getElementById("locationFilter"), // filtro do dashboard
-    document.getElementById("local"),           // formulário de pesagem
-    document.getElementById("historyLocation")  // filtro do histórico
+    document.getElementById("locationFilter"),
+    document.getElementById("local"),
+    document.getElementById("historyLocation")
   ];
   selects.forEach((sel, i) => {
     if (!sel) return;
     const current = sel.value;
-    // Primeiro item: "Todos os locais" (valor diferente por contexto)
     if (i === 0) sel.innerHTML = `<option value="all">Todos os locais</option>`;
     else         sel.innerHTML = `<option value="">Todos os locais</option>`;
-    // Adiciona cada local como opção
     locations.forEach(l => sel.innerHTML += `<option value="${l.id}">${l.name}</option>`);
-    // Mantém a seleção atual se ainda existir
     if ([...sel.options].some(o => o.value === current)) sel.value = current;
   });
 }
 
 // ============================================================
 // FILTRO DE DADOS DO DASHBOARD
-// No Supabase: aplicar filtros diretamente na query com .gte(), .eq() etc.
-// Ex.: supabase.from("pesagens").select("*").gte("date", cutoff).eq("location_id", loc)
 // ============================================================
 function filteredData() {
   const period = document.getElementById("periodFilter")?.value || "30";
   const loc    = document.getElementById("locationFilter")?.value || "all";
   let arr = [...data];
-
-  // Filtra por local
   if (loc !== "all") arr = arr.filter(x => x.locationId === loc);
-
-  // Filtra por período (dias atrás)
   if (period !== "all") {
     const days = Number(period), cutoff = new Date();
     cutoff.setHours(0,0,0,0);
     cutoff.setDate(cutoff.getDate() - days);
     arr = arr.filter(x => new Date(x.date+"T12:00:00") >= cutoff);
   }
-
-  // Ordena do mais recente para o mais antigo
   return arr.sort((a,b) => b.date.localeCompare(a.date));
 }
 
 // ============================================================
 // RENDERIZAÇÃO DO DASHBOARD
-// Orquestra todos os gráficos e métricas da tela principal.
-// Após migração: chamar filteredData() como async e aguardar resultado do Supabase.
 // ============================================================
 function renderDashboard() {
-  const arr    = filteredData();
-  const total  = arr.reduce((s,x) => s+x.weight, 0);
-  // Peso total de resíduos com destinação sustentável
+  const arr     = filteredData();
+  const total   = arr.reduce((s,x) => s+x.weight, 0);
   const recycle = arr.filter(x => ["Reciclagem","Compostagem","Reutilização"].includes(x.destination))
                      .reduce((s,x) => s+x.weight, 0);
   const non  = total - recycle;
   const days = Number(document.getElementById("periodFilter").value === "all" ? 30 : document.getElementById("periodFilter").value) || 30;
 
-  // Atualiza os cards de métricas no topo
-  document.getElementById("metricTotal").textContent       = kg(total);
-  document.getElementById("metricRecycle").textContent     = kg(recycle);
-  document.getElementById("metricNonRecycle").textContent  = kg(non);
-  document.getElementById("metricDaily").textContent       = kg(total/days);
-  document.getElementById("metricRecyclePct").textContent  = total ? pct(recycle/total*100) : "0% do total";
-  document.getElementById("metricNonRecyclePct").textContent = total ? pct(non/total*100) : "0% do total";
-  document.getElementById("metricTotalNote").textContent   = arr.length ? `${arr.length} pesagens registradas` : "Sem dados ainda";
+  document.getElementById("metricTotal").textContent        = kg(total);
+  document.getElementById("metricRecycle").textContent      = kg(recycle);
+  document.getElementById("metricNonRecycle").textContent   = kg(non);
+  document.getElementById("metricDaily").textContent        = kg(total/days);
+  document.getElementById("metricRecyclePct").textContent   = total ? pct(recycle/total*100) : "0% do total";
+  document.getElementById("metricNonRecyclePct").textContent= total ? pct(non/total*100) : "0% do total";
+  document.getElementById("metricTotalNote").textContent    = arr.length ? `${arr.length} pesagens registradas` : "Sem dados ainda";
 
-  // Agrupa peso por categoria de resíduo
   const cat = {};
   ["Orgânico","Plástico","Papel","Metal","Vidro","Rejeitos"].forEach(t => cat[t] = 0);
   arr.forEach(x => cat[x.type] = (cat[x.type]||0) + x.weight);
 
-  // Renderiza os componentes visuais
   renderBars(cat);
   renderDonut(cat, total);
   renderTrend(arr);
@@ -222,8 +136,7 @@ function renderDashboard() {
 }
 
 // ============================================================
-// GRÁFICO DE BARRAS — categorias de resíduo
-// Dados vêm de cat{} calculado em renderDashboard().
+// GRÁFICO DE BARRAS
 // ============================================================
 function renderBars(cat) {
   const max = Math.max(1, ...Object.values(cat));
@@ -236,12 +149,11 @@ function renderBars(cat) {
 }
 
 // ============================================================
-// GRÁFICO DE ROSCA (DONUT) — composição percentual
+// GRÁFICO DE ROSCA (DONUT)
 // ============================================================
 function renderDonut(cat, total) {
   const entries = Object.entries(cat);
   let cursor = 0;
-  // Monta os segmentos do conic-gradient
   const parts = entries.map(([name,v]) => {
     const start = cursor;
     cursor += total ? v/total*100 : 0;
@@ -261,8 +173,7 @@ function renderDonut(cat, total) {
 }
 
 // ============================================================
-// AGRUPAMENTO POR SEMANA — usado no gráfico de tendência
-// Retorna a data da segunda-feira da semana de uma data
+// GRÁFICO DE LINHA — evolução semanal
 // ============================================================
 function weekKey(date) {
   const d = new Date(date+"T12:00:00");
@@ -270,34 +181,22 @@ function weekKey(date) {
   d.setDate(d.getDate() - day + 1);
   return d.toISOString().slice(0,10);
 }
-
-// ============================================================
-// GRÁFICO DE LINHA — evolução semanal de resíduos
-// No Supabase: agrupar por semana com uma query SQL usando date_trunc('week', date)
-// ============================================================
 function renderTrend(arr) {
-  // Agrupa peso total por semana
   const by = {};
   arr.forEach(x => { const k = weekKey(x.date); by[k] = (by[k]||0) + x.weight; });
-
-  // Pega as últimas 6 semanas ordenadas
   const pts = Object.entries(by).sort((a,b) => a[0].localeCompare(b[0])).slice(-6);
   const max = Math.max(1, ...pts.map(p => p[1]));
   const chart = document.getElementById("trendChart");
-
   if (!pts.length) {
     chart.innerHTML = '<div class="empty">Cadastre pesagens para visualizar a evolução.</div>';
     return;
   }
-
-  // Calcula coordenadas SVG para cada ponto
   const w=800, h=205, pad=22;
   const coords = pts.map((p,i) => [
     (i*(w-pad*2)/Math.max(1,pts.length-1))+pad,
     h-pad-(p[1]/max)*(h-pad*2)
   ]);
   const poly = coords.map(p => p.join(",")).join(" ");
-
   chart.innerHTML = `
     <div class="chart-grid">
       <svg class="line-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
@@ -310,12 +209,10 @@ function renderTrend(arr) {
 
 // ============================================================
 // INSIGHTS AUTOMÁTICOS
-// Gerados a partir dos dados calculados — lógica permanece igual após migração.
 // ============================================================
 function renderInsights(cat, total, recycle, arr) {
   const plastic = cat["Plástico"]||0, organic = cat["Orgânico"]||0;
   const items = [];
-
   if (plastic > 0)
     items.push(["↗️","Atenção ao plástico",`O plástico representa ${pct(total?plastic/total*100:0)} dos resíduos. Avalie a redução de embalagens descartáveis.`]);
   if (total && recycle/total >= 0.5)
@@ -324,15 +221,13 @@ function renderInsights(cat, total, recycle, arr) {
     items.push(["🌱","Foco no orgânico",`O resíduo orgânico representa ${pct(organic/total*100)} do total. Considere ações de compostagem e combate ao desperdício.`]);
   if (!items.length)
     items.push(["💡","Comece o monitoramento","Cadastre algumas pesagens semanais para que o sistema consiga gerar insights automaticamente."]);
-
   document.getElementById("insights").innerHTML = items.map(x =>
     `<div class="insight"><div class="insight-icon">${x[0]}</div><div><strong>${x[1]}</strong><p>${x[2]}</p></div></div>`
   ).join("");
 }
 
 // ============================================================
-// TABELA DE PESAGENS RECENTES (últimas 5)
-// No Supabase: supabase.from("pesagens").select("*, locais(name)").order("date", {ascending:false}).limit(5)
+// TABELA DE PESAGENS RECENTES
 // ============================================================
 function renderRecent(arr) {
   const tbody = document.getElementById("recentTable");
@@ -353,17 +248,12 @@ function renderRecent(arr) {
 
 // ============================================================
 // BARRAS DE RESÍDUOS POR LOCAL
-// No Supabase: agrupar com .select("location_id, weight.sum()").groupBy("location_id")
 // ============================================================
 function renderLocationBars(arr) {
-  // Soma o peso por location_id
   const totals = {};
   arr.forEach(x => totals[x.locationId] = (totals[x.locationId]||0) + x.weight);
-
-  // Ordena locais do maior para o menor total
   const rows = locations.map(l => [l, totals[l.id]||0]).sort((a,b) => b[1]-a[1]);
   const max  = Math.max(1, ...rows.map(r => r[1]));
-
   document.getElementById("locationBars").innerHTML = rows.map((r,i) =>
     `<div class="loc-row">
       <span>${r[0].name}</span>
@@ -374,22 +264,17 @@ function renderLocationBars(arr) {
 }
 
 // ============================================================
-// HISTÓRICO DE PESAGENS (com busca e filtros)
-// No Supabase: supabase.from("pesagens").select("*, locais(name)")
-//   .ilike("locais.name", `%${q}%`).eq("type", type).eq("location_id", loc)
+// HISTÓRICO DE PESAGENS
 // ============================================================
 function renderHistory() {
   const q    = (document.getElementById("searchHistory").value||"").toLowerCase();
   const type = document.getElementById("historyType").value;
   const loc  = document.getElementById("historyLocation").value;
-
-  // Filtra localmente por texto, tipo e local
-  const arr = data.filter(x =>
+  const arr  = data.filter(x =>
     (!q || getLocation(x.locationId).toLowerCase().includes(q) || x.type.toLowerCase().includes(q)) &&
     (!type || x.type === type) &&
     (!loc  || x.locationId === loc)
   ).sort((a,b) => b.date.localeCompare(a.date));
-
   const tbody = document.getElementById("historyTable");
   tbody.innerHTML = arr.length
     ? arr.map(x =>
@@ -407,7 +292,6 @@ function renderHistory() {
 
 // ============================================================
 // CARDS DE LOCAIS DE COLETA
-// No Supabase: buscar locais e fazer JOIN com pesagens para calcular totais
 // ============================================================
 function renderLocations() {
   const cards = document.getElementById("locationCards");
@@ -425,13 +309,12 @@ function renderLocations() {
 
 // ============================================================
 // EXPORTAÇÃO CSV
-// No Supabase: buscar todos os dados com select("*, locais(name)") antes de gerar o CSV
 // ============================================================
 function exportCsv() {
   const header = ["id","data","local","tipo_residuo","peso_kg","destinacao","observacao"];
   const rows   = data.map(x => [x.id, x.date, getLocation(x.locationId), x.type, x.weight, x.destination, (x.notes||"")]);
   const csv    = [header,...rows].map(row => row.map(v => `"${String(v).replaceAll('"','""')}"`).join(";")).join("\n");
-  const blob   = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const blob   = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8"});
   const a      = document.createElement("a");
   a.href       = URL.createObjectURL(blob);
   a.download   = "ecomonitor_pesagens.csv";
@@ -441,74 +324,58 @@ function exportCsv() {
 }
 
 // ============================================================
-// NAVEGAÇÃO ENTRE SEÇÕES (SPA sem roteador)
-// Permanece igual após migração — é lógica de UI pura.
+// NAVEGAÇÃO ENTRE SEÇÕES
 // ============================================================
 function navigate(section) {
-  // Esconde todas as páginas e mostra a selecionada
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.getElementById(`section-${section}`).classList.add("active");
-
-  // Atualiza o item ativo no menu lateral
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.section === section));
-
-  // Renderiza o conteúdo da seção acessada
   if (section === "dashboard") renderDashboard();
   if (section === "historico") renderHistory();
   if (section === "locais")    renderLocations();
-
-  // Fecha o menu lateral em mobile
   if (window.innerWidth <= 800) document.getElementById("sidebar").classList.remove("open");
 }
 
 // ============================================================
-// DELEGAÇÃO DE EVENTOS GLOBAIS (cliques)
+// DELEGAÇÃO DE EVENTOS GLOBAIS
 // ============================================================
 document.addEventListener("click", e => {
-  // Clique em item de navegação
   const nav = e.target.closest(".nav-item");
   if (nav) navigate(nav.dataset.section);
 
-  // Clique em botão com data-go (atalho de navegação)
   const go = e.target.closest("[data-go]");
   if (go) navigate(go.dataset.go);
 
-  // Clique em botão de excluir pesagem
   const del = e.target.closest("[data-delete]");
   if (del) {
     const id = del.dataset.delete;
-    // No Supabase: substituir confirm() por modal customizado
-    // e trocar data.filter() por: await supabase.from("pesagens").delete().eq("id", id)
     if (confirm("Excluir esta pesagem?")) {
-      data = data.filter(x => x.id !== id);
-      saveData();
-      renderHistory();
-      renderDashboard();
-      showToast("Pesagem excluída.");
+      // Exclui no Supabase e atualiza memória local
+      db.from("pesagens").delete().eq("id", id).then(() => {
+        data = data.filter(x => x.id !== id);
+        renderHistory();
+        renderDashboard();
+        showToast("Pesagem excluída.");
+      });
     }
   }
 });
 
-// Abre/fecha o menu lateral (mobile)
 document.getElementById("menuBtn").addEventListener("click", () =>
   document.getElementById("sidebar").classList.toggle("open")
 );
 
-// Re-renderiza o dashboard ao mudar os filtros de período ou local
 ["periodFilter","locationFilter"].forEach(id =>
   document.getElementById(id)?.addEventListener("change", renderDashboard)
 );
 
-// Re-renderiza o histórico ao digitar na busca ou mudar filtros
 ["searchHistory","historyType","historyLocation"].forEach(id =>
   document.getElementById(id)?.addEventListener(id === "searchHistory" ? "input" : "change", renderHistory)
 );
 
-// Alternância semanal/mensal no gráfico de tendência
 document.querySelectorAll(".segmented button").forEach(btn => btn.addEventListener("click", () => {
   document.querySelectorAll(".segmented button").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
-  // MVP: estrutura preparada para evolução — hoje usa apenas semanas
   const subtitle = document.getElementById("trendSubtitle");
   subtitle.textContent = btn.dataset.trend === "monthly"
     ? "Visão mensal (estrutura preparada para evolução futura)"
@@ -517,71 +384,57 @@ document.querySelectorAll(".segmented button").forEach(btn => btn.addEventListen
 }));
 
 // ============================================================
-// FORMULÁRIO DE NOVA PESAGEM
-// No Supabase: substituir data.push() por:
-//   await supabase.from("pesagens").insert([item])
-// e remover saveData() — o banco persiste automaticamente.
+// FORMULÁRIO DE NOVA PESAGEM — INSERT no Supabase
 // ============================================================
-document.getElementById("weighingForm").addEventListener("submit", e => {
+document.getElementById("weighingForm").addEventListener("submit", async e => {
   e.preventDefault();
   const item = {
-    id:          Date.now().toString(), // no Supabase: gerado automaticamente (uuid)
     date:        document.getElementById("date").value,
-    locationId:  document.getElementById("local").value,       // no Supabase: location_id
+    location_id: document.getElementById("local").value,
     type:        document.getElementById("wasteType").value,
     weight:      Number(document.getElementById("weight").value),
     destination: document.getElementById("destination").value,
     notes:       document.getElementById("notes").value.trim()
   };
-
-  // Validação básica dos campos obrigatórios
-  if (!item.date || !item.locationId || !item.type || !item.weight || !item.destination) {
+  if (!item.date || !item.location_id || !item.type || !item.weight || !item.destination) {
     showToast("Preencha todos os campos obrigatórios.");
     return;
   }
-
-  data.push(item);
-  saveData();
+  const { data: inserted, error } = await db.from("pesagens").insert([item]).select().single();
+  if (error) { showToast("Erro ao salvar. Tente novamente."); return; }
+  // Adiciona na memória local com locationId mapeado
+  data.unshift({ ...inserted, locationId: inserted.location_id });
   e.target.reset();
   document.getElementById("date").valueAsDate = new Date();
   renderDashboard();
   showToast("Pesagem registrada com sucesso!");
 });
 
-// Limpa o formulário de pesagem
 document.getElementById("clearForm").addEventListener("click", () =>
   document.getElementById("weighingForm").reset()
 );
 
 // ============================================================
-// FORMULÁRIO DE NOVO LOCAL
-// No Supabase: substituir locations.push() por:
-//   await supabase.from("locais").insert([{ name, type }])
-// e remover saveLocations().
+// FORMULÁRIO DE NOVO LOCAL — INSERT no Supabase
 // ============================================================
-document.getElementById("locationForm").addEventListener("submit", e => {
+document.getElementById("locationForm").addEventListener("submit", async e => {
   e.preventDefault();
   const name = document.getElementById("newLocation").value.trim();
   const type = document.getElementById("locationType").value;
   if (!name) return;
-
-  locations.push({ id: "loc"+Date.now(), name, type }); // no Supabase: id gerado pelo banco
-  saveLocations();
+  const { data: inserted, error } = await db.from("locais").insert([{ name, type }]).select().single();
+  if (error) { showToast("Erro ao salvar local. Tente novamente."); return; }
+  locations.push(inserted);
   populateLocationSelects();
   renderLocations();
   showToast("Local adicionado.");
   e.target.reset();
 });
 
-// Botão de exportar CSV
 document.getElementById("exportCsv").addEventListener("click", exportCsv);
 
 // ============================================================
-// INICIALIZAÇÃO DA APLICAÇÃO
-// No Supabase: tornar esta seção assíncrona (async/await)
-// e aguardar o carregamento dos dados antes de renderizar.
+// INICIALIZAÇÃO — carrega dados do Supabase e renderiza
 // ============================================================
-document.getElementById("date").valueAsDate = new Date(); // pré-preenche a data de hoje
-populateLocationSelects(); // popula todos os selects de local
-renderDashboard();         // renderiza o dashboard inicial
-renderLocations();         // renderiza os cards de locais
+document.getElementById("date").valueAsDate = new Date();
+fetchAll();

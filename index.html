@@ -469,9 +469,9 @@
        Aparece brevemente na tela para confirmar ações do usuário -->
   <div class="toast" id="toast"></div>
 
-  <!-- Script principal da aplicação
-       No Supabase: adicionar o SDK antes deste script e inicializar o client:
-       const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) -->
+  <!-- SDK do Supabase — deve vir antes do app.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Script principal da aplicação -->
   <script src="app.js"></script>
 </body>
 </html>
