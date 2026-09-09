@@ -299,12 +299,38 @@ function renderLocations() {
     const total = data.filter(x => x.locationId === l.id).reduce((s,x) => s+x.weight, 0);
     const count = data.filter(x => x.locationId === l.id).length;
     return `<article class="location-card">
-      <h3>${l.name}</h3>
-      <p>${l.type}</p>
+      <div class="location-card-header">
+        <div>
+          <h3>${l.name}</h3>
+          <p>${l.type}</p>
+        </div>
+        <div class="location-card-actions">
+          <button class="action-btn edit-btn" data-edit-id="${l.id}" data-edit-name="${l.name}" data-edit-type="${l.type}">Editar</button>
+          <button class="action-btn" data-delete-loc="${l.id}">Excluir</button>
+        </div>
+      </div>
       <div class="loc-total">${kg(total)}</div>
       <p>${count} pesagem(ns)</p>
     </article>`;
   }).join("");
+}
+
+// Abre o formulário em modo edição preenchendo os campos com os dados do local
+function openEditLocation(id, name, type) {
+  const form = document.getElementById("locationForm");
+  document.getElementById("newLocation").value = name;
+  document.getElementById("locationType").value = type;
+  form.dataset.editId = id;
+  form.querySelector("button[type=submit]").textContent = "💾 Salvar alterações";
+  document.getElementById("newLocation").focus();
+}
+
+// Reseta o formulário de local para o modo de criação
+function resetLocationForm() {
+  const form = document.getElementById("locationForm");
+  form.reset();
+  delete form.dataset.editId;
+  form.querySelector("button[type=submit]").textContent = "＋ Adicionar";
 }
 
 // ============================================================
@@ -350,12 +376,33 @@ document.addEventListener("click", e => {
   if (del) {
     const id = del.dataset.delete;
     if (confirm("Excluir esta pesagem?")) {
-      // Exclui no Supabase e atualiza memória local
       db.from("pesagens").delete().eq("id", id).then(() => {
         data = data.filter(x => x.id !== id);
         renderHistory();
         renderDashboard();
         showToast("Pesagem excluída.");
+      });
+    }
+  }
+
+  // Clique em editar local — preenche o formulário com os dados do local
+  const edit = e.target.closest("[data-edit-id]");
+  if (edit) openEditLocation(edit.dataset.editId, edit.dataset.editName, edit.dataset.editType);
+
+  // Clique em excluir local
+  const delLoc = e.target.closest("[data-delete-loc]");
+  if (delLoc) {
+    const id = delLoc.dataset.deleteLoc;
+    if (data.some(x => x.locationId === id)) {
+      showToast("Remova as pesagens deste local antes de excluí-lo.");
+      return;
+    }
+    if (confirm("Excluir este local?")) {
+      db.from("locais").delete().eq("id", id).then(() => {
+        locations = locations.filter(l => l.id !== id);
+        populateLocationSelects();
+        renderLocations();
+        showToast("Local excluído.");
       });
     }
   }
@@ -415,20 +462,33 @@ document.getElementById("clearForm").addEventListener("click", () =>
 );
 
 // ============================================================
-// FORMULÁRIO DE NOVO LOCAL — INSERT no Supabase
+// FORMULÁRIO DE LOCAL — INSERT ou UPDATE no Supabase
 // ============================================================
 document.getElementById("locationForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const name = document.getElementById("newLocation").value.trim();
-  const type = document.getElementById("locationType").value;
+  const name   = document.getElementById("newLocation").value.trim();
+  const type   = document.getElementById("locationType").value;
+  const editId = e.target.dataset.editId;
   if (!name) return;
-  const { data: inserted, error } = await db.from("locais").insert([{ name, type }]).select().single();
-  if (error) { showToast("Erro ao salvar local. Tente novamente."); return; }
-  locations.push(inserted);
+
+  if (editId) {
+    // Modo edição — UPDATE no Supabase
+    const { error } = await db.from("locais").update({ name, type }).eq("id", editId);
+    if (error) { showToast("Erro ao atualizar local."); return; }
+    const loc = locations.find(l => l.id === editId);
+    if (loc) { loc.name = name; loc.type = type; }
+    showToast("Local atualizado.");
+  } else {
+    // Modo criação — INSERT no Supabase
+    const { data: inserted, error } = await db.from("locais").insert([{ name, type }]).select().single();
+    if (error) { showToast("Erro ao salvar local."); return; }
+    locations.push(inserted);
+    showToast("Local adicionado.");
+  }
+
+  resetLocationForm();
   populateLocationSelects();
   renderLocations();
-  showToast("Local adicionado.");
-  e.target.reset();
 });
 
 document.getElementById("exportCsv").addEventListener("click", exportCsv);
