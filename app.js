@@ -305,7 +305,7 @@ function renderLocations() {
           <p>${l.type}</p>
         </div>
         <div class="location-card-actions">
-          <button class="action-btn edit-btn" data-edit-id="${l.id}" data-edit-name="${l.name}" data-edit-type="${l.type}">Editar</button>
+          <button class="action-btn edit-btn" data-edit-id="${l.id}">Editar</button>
           <button class="action-btn" data-delete-loc="${l.id}">Excluir</button>
         </div>
       </div>
@@ -315,11 +315,13 @@ function renderLocations() {
   }).join("");
 }
 
-// Abre o formulário em modo edição preenchendo os campos com os dados do local
-function openEditLocation(id, name, type) {
+// Abre o formulário em modo edição buscando os dados direto do array locations
+function openEditLocation(id) {
+  const loc = locations.find(l => l.id === id);
+  if (!loc) return;
   const form = document.getElementById("locationForm");
-  document.getElementById("newLocation").value = name;
-  document.getElementById("locationType").value = type;
+  document.getElementById("newLocation").value = loc.name;
+  document.getElementById("locationType").value = loc.type;
   form.dataset.editId = id;
   form.querySelector("button[type=submit]").textContent = "💾 Salvar alterações";
   document.getElementById("newLocation").focus();
@@ -387,7 +389,7 @@ document.addEventListener("click", e => {
 
   // Clique em editar local — preenche o formulário com os dados do local
   const edit = e.target.closest("[data-edit-id]");
-  if (edit) openEditLocation(edit.dataset.editId, edit.dataset.editName, edit.dataset.editType);
+  if (edit) openEditLocation(edit.dataset.editId);
 
   // Clique em excluir local
   const delLoc = e.target.closest("[data-delete-loc]");
