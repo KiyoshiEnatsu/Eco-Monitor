@@ -387,17 +387,58 @@ function resetLocationForm() {
 }
 
 // ============================================================
-// EXPORTAÇÃO CSV — 4 tipos de relatório
+// EXPORTAÇÃO XLSX — 4 tipos de relatório com formatação
 // ============================================================
-function csvDownload(filename, rows) {
-  const csv  = "sep=;\n" + rows.map(r => r.map(v => `"${String(v ?? "").replaceAll('"','""')}"`).join(";")).join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-  const a    = document.createElement("a");
-  a.href     = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  showToast("CSV exportado com sucesso!");
+function xlsxDownload(filename, rows) {
+  const GREEN      = "15966a";
+  const LINE       = "e6ebf0";
+  const GREEN_SOFT = "e8f7ef";
+  const WHITE      = "ffffff";
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const ncols = rows[0].length;
+
+  // Largura automática das colunas
+  ws["!cols"] = rows[0].map((_, ci) => ({
+    wch: Math.min(40, Math.max(12, ...rows.map(r => String(r[ci] ?? "").length)))
+  }));
+
+  // Estilo do cabeçalho (linha 1) — fundo verde, texto branco, negrito
+  for (let c = 0; c < ncols; c++) {
+    const ref = XLSX.utils.encode_cell({ r: 0, c });
+    if (!ws[ref]) continue;
+    ws[ref].s = {
+      fill:  { fgColor: { rgb: GREEN } },
+      font:  { bold: true, color: { rgb: WHITE }, sz: 11 },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: { bottom: { style: "thin", color: { rgb: WHITE } } }
+    };
+  }
+
+  // Estilo das linhas de dados — alternando LINE e GREEN_SOFT
+  for (let r = 1; r < rows.length; r++) {
+    const bg = r % 2 === 0 ? LINE : GREEN_SOFT;
+    for (let c = 0; c < ncols; c++) {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      if (!ws[ref]) ws[ref] = { v: "", t: "s" };
+      ws[ref].s = {
+        fill:      { fgColor: { rgb: bg } },
+        font:      { sz: 10 },
+        alignment: { vertical: "center" },
+        border: {
+          top:    { style: "thin", color: { rgb: LINE } },
+          bottom: { style: "thin", color: { rgb: LINE } },
+          left:   { style: "thin", color: { rgb: LINE } },
+          right:  { style: "thin", color: { rgb: LINE } }
+        }
+      };
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "EcoMonitor");
+  XLSX.writeFile(wb, filename, { bookType: "xlsx", cellStyles: true });
+  showToast("Relatório exportado com sucesso!");
 }
 
 function filteredReportData() {
@@ -417,10 +458,12 @@ function exportCompleto() {
   const arr  = filteredReportData();
   const rows = [
     ["Data", "Local", "Tipo de Resíduo", "Peso (kg)", "Destinação", "Observação"],
-    ...arr.map(x => [formatDate(x.date), getLocation(x.locationId), x.type,
-                     Number(x.weight).toFixed(2).replace(".",","), x.destination, x.notes || ""])
+    ...arr.map(x => [
+      formatDate(x.date), getLocation(x.locationId), x.type,
+      Number(x.weight), x.destination, x.notes || ""
+    ])
   ];
-  csvDownload("ecomonitor_completo.csv", rows);
+  xlsxDownload("ecomonitor_completo.xlsx", rows);
 }
 
 function exportCategoria() {
@@ -431,15 +474,11 @@ function exportCategoria() {
   const total = Object.values(cat).reduce((s, v) => s + v, 0);
   const rows = [
     ["Tipo de Resíduo", "Total (kg)", "Participação (%)"],
-    ...Object.entries(cat).map(([t, v]) => [
-      t,
-      Number(v).toFixed(2).replace(".",","),
-      total ? (v / total * 100).toFixed(1).replace(".",",") + "%" : "0,0%"
-    ]),
+    ...Object.entries(cat).map(([t, v]) => [t, Number(v.toFixed(2)), total ? Number((v/total*100).toFixed(1)) : 0]),
     ["", "", ""],
-    ["TOTAL", Number(total).toFixed(2).replace(".",","), "100,0%"]
+    ["TOTAL", Number(total.toFixed(2)), 100]
   ];
-  csvDownload("ecomonitor_por_categoria.csv", rows);
+  xlsxDownload("ecomonitor_por_categoria.xlsx", rows);
 }
 
 function exportLocal() {
@@ -449,15 +488,13 @@ function exportLocal() {
   const total  = Object.values(totais).reduce((s, v) => s + v, 0);
   const rows   = [
     ["Local", "Total (kg)", "Participação (%)"],
-    ...locations.map(l => {
-      const v = totais[l.id] || 0;
-      return [l.name, Number(v).toFixed(2).replace(".",","),
-              total ? (v / total * 100).toFixed(1).replace(".",",") + "%" : "0,0%"];
-    }).sort((a, b) => parseFloat(b[1].replace(",",".")) - parseFloat(a[1].replace(",","."))),
+    ...locations
+      .map(l => { const v = totais[l.id] || 0; return [l.name, Number(v.toFixed(2)), total ? Number((v/total*100).toFixed(1)) : 0]; })
+      .sort((a, b) => b[1] - a[1]),
     ["", "", ""],
-    ["TOTAL", Number(total).toFixed(2).replace(".",","), "100,0%"]
+    ["TOTAL", Number(total.toFixed(2)), 100]
   ];
-  csvDownload("ecomonitor_por_local.csv", rows);
+  xlsxDownload("ecomonitor_por_local.xlsx", rows);
 }
 
 function exportDestinacao() {
@@ -467,15 +504,13 @@ function exportDestinacao() {
   const total = Object.values(dest).reduce((s, v) => s + v, 0);
   const rows  = [
     ["Destinação", "Total (kg)", "Participação (%)"],
-    ...Object.entries(dest).sort((a, b) => b[1] - a[1]).map(([d, v]) => [
-      d,
-      Number(v).toFixed(2).replace(".",","),
-      total ? (v / total * 100).toFixed(1).replace(".",",") + "%" : "0,0%"
-    ]),
+    ...Object.entries(dest)
+      .sort((a, b) => b[1] - a[1])
+      .map(([d, v]) => [d, Number(v.toFixed(2)), total ? Number((v/total*100).toFixed(1)) : 0]),
     ["", "", ""],
-    ["TOTAL", Number(total).toFixed(2).replace(".",","), "100,0%"]
+    ["TOTAL", Number(total.toFixed(2)), 100]
   ];
-  csvDownload("ecomonitor_por_destinacao.csv", rows);
+  xlsxDownload("ecomonitor_por_destinacao.xlsx", rows);
 }
 
 function populateRelatorioSelects() {

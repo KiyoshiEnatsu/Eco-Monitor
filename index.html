@@ -512,7 +512,7 @@
                 <h3>Relatório Completo</h3>
                 <p>Todas as pesagens com data, local, tipo, peso, destinação e observação.</p>
               </div>
-              <button class="primary-btn" data-report="completo">⬇ Exportar CSV</button>
+              <button class="primary-btn" data-report="completo">⬇ Exportar Excel</button>
             </article>
 
             <article class="report-type-card">
@@ -521,7 +521,7 @@
                 <h3>Resumo por Categoria</h3>
                 <p>Total acumulado por tipo de resíduo no período selecionado.</p>
               </div>
-              <button class="primary-btn" data-report="categoria">⬇ Exportar CSV</button>
+              <button class="primary-btn" data-report="categoria">⬇ Exportar Excel</button>
             </article>
 
             <article class="report-type-card">
@@ -530,7 +530,7 @@
                 <h3>Resumo por Local</h3>
                 <p>Total acumulado por ponto de coleta no período selecionado.</p>
               </div>
-              <button class="primary-btn" data-report="local">⬇ Exportar CSV</button>
+              <button class="primary-btn" data-report="local">⬇ Exportar Excel</button>
             </article>
 
             <article class="report-type-card">
@@ -539,7 +539,7 @@
                 <h3>Destinação dos Resíduos</h3>
                 <p>Totais agrupados por tipo de destinação (reciclagem, aterro, etc.).</p>
               </div>
-              <button class="primary-btn" data-report="destinacao">⬇ Exportar CSV</button>
+              <button class="primary-btn" data-report="destinacao">⬇ Exportar Excel</button>
             </article>
 
           </div>
@@ -555,6 +555,8 @@
 
   <!-- SDK do Supabase — deve vir antes do app.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- SheetJS — geração de .xlsx com formatação -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Script principal da aplicação -->
   <script src="app.js"></script>
 </body>
