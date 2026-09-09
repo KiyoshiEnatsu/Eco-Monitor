@@ -38,6 +38,7 @@ async function fetchAll() {
   data = (pesagens || []).map(x => ({ ...x, locationId: x.location_id }));
   populateLocationSelects();
   populateAmbienteSelects();
+  populateRelatorioSelects();
   renderDashboard();
   renderLocations();
   renderAmbientes();
@@ -386,19 +387,102 @@ function resetLocationForm() {
 }
 
 // ============================================================
-// EXPORTAÇÃO CSV
+// EXPORTAÇÃO CSV — 4 tipos de relatório
 // ============================================================
-function exportCsv() {
-  const header = ["id","data","local","tipo_residuo","peso_kg","destinacao","observacao"];
-  const rows   = data.map(x => [x.id, x.date, getLocation(x.locationId), x.type, x.weight, x.destination, (x.notes||"")]);
-  const csv    = [header,...rows].map(row => row.map(v => `"${String(v).replaceAll('"','""')}"`).join(";")).join("\n");
-  const blob   = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8"});
-  const a      = document.createElement("a");
-  a.href       = URL.createObjectURL(blob);
-  a.download   = "ecomonitor_pesagens.csv";
+function csvDownload(filename, rows) {
+  const csv  = rows.map(r => r.map(v => `"${String(v ?? "").replaceAll('"','""')}"`).join(";")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const a    = document.createElement("a");
+  a.href     = URL.createObjectURL(blob);
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
   showToast("CSV exportado com sucesso!");
+}
+
+function filteredReportData() {
+  const inicio = document.getElementById("relatorioInicio").value;
+  const fim    = document.getElementById("relatorioFim").value;
+  const local  = document.getElementById("relatorioLocal").value;
+  const tipo   = document.getElementById("relatorioTipo").value;
+  return data.filter(x =>
+    (!inicio || x.date >= inicio) &&
+    (!fim    || x.date <= fim) &&
+    (!local  || x.locationId === local) &&
+    (!tipo   || x.type === tipo)
+  ).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function exportCompleto() {
+  const arr  = filteredReportData();
+  const rows = [
+    ["Data", "Local", "Tipo de Resíduo", "Peso (kg)", "Destinação", "Observação"],
+    ...arr.map(x => [formatDate(x.date), getLocation(x.locationId), x.type,
+                     Number(x.weight).toFixed(2).replace(".",","), x.destination, x.notes || ""])
+  ];
+  csvDownload("ecomonitor_completo.csv", rows);
+}
+
+function exportCategoria() {
+  const arr = filteredReportData();
+  const cat = {};
+  ["Orgânico","Plástico","Papel","Metal","Vidro","Rejeitos"].forEach(t => cat[t] = 0);
+  arr.forEach(x => cat[x.type] = (cat[x.type] || 0) + x.weight);
+  const total = Object.values(cat).reduce((s, v) => s + v, 0);
+  const rows = [
+    ["Tipo de Resíduo", "Total (kg)", "Participação (%)"],
+    ...Object.entries(cat).map(([t, v]) => [
+      t,
+      Number(v).toFixed(2).replace(".",","),
+      total ? (v / total * 100).toFixed(1).replace(".",",") + "%" : "0,0%"
+    ]),
+    ["", "", ""],
+    ["TOTAL", Number(total).toFixed(2).replace(".",","), "100,0%"]
+  ];
+  csvDownload("ecomonitor_por_categoria.csv", rows);
+}
+
+function exportLocal() {
+  const arr    = filteredReportData();
+  const totais = {};
+  arr.forEach(x => totais[x.locationId] = (totais[x.locationId] || 0) + x.weight);
+  const total  = Object.values(totais).reduce((s, v) => s + v, 0);
+  const rows   = [
+    ["Local", "Total (kg)", "Participação (%)"],
+    ...locations.map(l => {
+      const v = totais[l.id] || 0;
+      return [l.name, Number(v).toFixed(2).replace(".",","),
+              total ? (v / total * 100).toFixed(1).replace(".",",") + "%" : "0,0%"];
+    }).sort((a, b) => parseFloat(b[1].replace(",",".")) - parseFloat(a[1].replace(",","."))),
+    ["", "", ""],
+    ["TOTAL", Number(total).toFixed(2).replace(".",","), "100,0%"]
+  ];
+  csvDownload("ecomonitor_por_local.csv", rows);
+}
+
+function exportDestinacao() {
+  const arr  = filteredReportData();
+  const dest = {};
+  arr.forEach(x => dest[x.destination] = (dest[x.destination] || 0) + x.weight);
+  const total = Object.values(dest).reduce((s, v) => s + v, 0);
+  const rows  = [
+    ["Destinação", "Total (kg)", "Participação (%)"],
+    ...Object.entries(dest).sort((a, b) => b[1] - a[1]).map(([d, v]) => [
+      d,
+      Number(v).toFixed(2).replace(".",","),
+      total ? (v / total * 100).toFixed(1).replace(".",",") + "%" : "0,0%"
+    ]),
+    ["", "", ""],
+    ["TOTAL", Number(total).toFixed(2).replace(".",","), "100,0%"]
+  ];
+  csvDownload("ecomonitor_por_destinacao.csv", rows);
+}
+
+function populateRelatorioSelects() {
+  const sel = document.getElementById("relatorioLocal");
+  if (!sel) return;
+  sel.innerHTML = `<option value="">Todos os locais</option>`;
+  locations.forEach(l => sel.innerHTML += `<option value="${l.id}">${l.name}</option>`);
 }
 
 // ============================================================
@@ -596,7 +680,13 @@ document.getElementById("ambienteForm").addEventListener("submit", async e => {
 });
 
 document.getElementById("cancelEditAmbiente").addEventListener("click", resetAmbienteForm);
-document.getElementById("exportCsv").addEventListener("click", exportCsv);
+
+document.addEventListener("click", e => {
+  const btn = e.target.closest("[data-report]");
+  if (!btn) return;
+  const map = { completo: exportCompleto, categoria: exportCategoria, local: exportLocal, destinacao: exportDestinacao };
+  map[btn.dataset.report]?.();
+});
 
 // ============================================================
 // INICIALIZAÇÃO — carrega dados do Supabase e renderiza
