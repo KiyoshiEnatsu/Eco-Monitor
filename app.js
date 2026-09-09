@@ -389,55 +389,51 @@ function resetLocationForm() {
 // ============================================================
 // EXPORTAÇÃO XLSX — 4 tipos de relatório com formatação
 // ============================================================
-function xlsxDownload(filename, rows) {
-  const GREEN      = "15966a";
-  const LINE       = "e6ebf0";
-  const GREEN_SOFT = "e8f7ef";
-  const WHITE      = "ffffff";
+async function xlsxDownload(filename, rows) {
+  const GREEN      = "FF15966a";
+  const GREEN_SOFT = "FFe8f7ef";
+  const LINE       = "FFe6ebf0";
+  const WHITE      = "FFFFFFFF";
+  const INK        = "FF162638";
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  const ncols = rows[0].length;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("EcoMonitor");
 
   // Largura automática das colunas
-  ws["!cols"] = rows[0].map((_, ci) => ({
-    wch: Math.min(40, Math.max(12, ...rows.map(r => String(r[ci] ?? "").length)))
+  ws.columns = rows[0].map((_, ci) => ({
+    width: Math.min(40, Math.max(14, ...rows.map(r => String(r[ci] ?? "").length)) + 2)
   }));
 
-  // Estilo do cabeçalho (linha 1) — fundo verde, texto branco, negrito
-  for (let c = 0; c < ncols; c++) {
-    const ref = XLSX.utils.encode_cell({ r: 0, c });
-    if (!ws[ref]) continue;
-    ws[ref].s = {
-      fill:  { fgColor: { rgb: GREEN } },
-      font:  { bold: true, color: { rgb: WHITE }, sz: 11 },
-      alignment: { horizontal: "center", vertical: "center", wrapText: true },
-      border: { bottom: { style: "thin", color: { rgb: WHITE } } }
-    };
-  }
+  rows.forEach((row, ri) => {
+    const wsRow = ws.addRow(row);
+    wsRow.height = 20;
 
-  // Estilo das linhas de dados — alternando LINE e GREEN_SOFT
-  for (let r = 1; r < rows.length; r++) {
-    const bg = r % 2 === 0 ? LINE : GREEN_SOFT;
-    for (let c = 0; c < ncols; c++) {
-      const ref = XLSX.utils.encode_cell({ r, c });
-      if (!ws[ref]) ws[ref] = { v: "", t: "s" };
-      ws[ref].s = {
-        fill:      { fgColor: { rgb: bg } },
-        font:      { sz: 10 },
-        alignment: { vertical: "center" },
-        border: {
-          top:    { style: "thin", color: { rgb: LINE } },
-          bottom: { style: "thin", color: { rgb: LINE } },
-          left:   { style: "thin", color: { rgb: LINE } },
-          right:  { style: "thin", color: { rgb: LINE } }
-        }
+    const isHeader = ri === 0;
+    const bg = isHeader ? GREEN : (ri % 2 === 1 ? GREEN_SOFT : LINE);
+
+    wsRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+      if (ci > rows[0].length) return;
+      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+      cell.font   = isHeader
+        ? { bold: true, color: { argb: WHITE }, size: 11, name: "Calibri" }
+        : { color: { argb: INK }, size: 10, name: "Calibri" };
+      cell.alignment = { vertical: "middle", horizontal: isHeader ? "center" : "left", wrapText: false };
+      cell.border = {
+        top:    { style: "thin", color: { argb: LINE } },
+        bottom: { style: "thin", color: { argb: LINE } },
+        left:   { style: "thin", color: { argb: LINE } },
+        right:  { style: "thin", color: { argb: LINE } }
       };
-    }
-  }
+    });
+  });
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "EcoMonitor");
-  XLSX.writeFile(wb, filename, { bookType: "xlsx", cellStyles: true });
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob   = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const a      = document.createElement("a");
+  a.href       = URL.createObjectURL(blob);
+  a.download   = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
   showToast("Relatório exportado com sucesso!");
 }
 
