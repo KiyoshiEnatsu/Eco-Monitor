@@ -467,17 +467,80 @@
           <div class="page-header">
             <div>
               <h1>Relatórios</h1>
-              <p>Exporte os registros para análise posterior.</p>
+              <p>Escolha o tipo de relatório e aplique os filtros desejados.</p>
             </div>
           </div>
 
-          <article class="panel report-panel">
-            <div class="report-icon">📊</div>
-            <h2>Exportação de dados</h2>
-            <p>Baixe todos os registros em CSV para usar no Excel, Power BI ou outro sistema de análise.</p>
-            <!-- Botão de exportar CSV — ouvido por exportCsv() em app.js -->
-            <button class="primary-btn" id="exportCsv">⬇ Exportar CSV</button>
+          <!-- Filtros globais -->
+          <article class="panel" style="margin-bottom:20px">
+            <div class="report-filters">
+              <label>
+                Data início
+                <input type="date" id="relatorioInicio">
+              </label>
+              <label>
+                Data fim
+                <input type="date" id="relatorioFim">
+              </label>
+              <label>
+                Local
+                <select id="relatorioLocal"><option value="">Todos os locais</option></select>
+              </label>
+              <label>
+                Tipo de resíduo
+                <select id="relatorioTipo">
+                  <option value="">Todos os tipos</option>
+                  <option>Orgânico</option>
+                  <option>Plástico</option>
+                  <option>Papel</option>
+                  <option>Metal</option>
+                  <option>Vidro</option>
+                  <option>Rejeitos</option>
+                </select>
+              </label>
+            </div>
           </article>
+
+          <!-- Cards de tipo de relatório -->
+          <div class="report-cards">
+
+            <article class="report-type-card">
+              <div class="report-type-icon" style="background:#e8f7ef">📋</div>
+              <div class="report-type-body">
+                <h3>Relatório Completo</h3>
+                <p>Todas as pesagens com data, local, tipo, peso, destinação e observação.</p>
+              </div>
+              <button class="primary-btn" data-report="completo">⬇ Exportar CSV</button>
+            </article>
+
+            <article class="report-type-card">
+              <div class="report-type-icon" style="background:#e7f0fc">📊</div>
+              <div class="report-type-body">
+                <h3>Resumo por Categoria</h3>
+                <p>Total acumulado por tipo de resíduo no período selecionado.</p>
+              </div>
+              <button class="primary-btn" data-report="categoria">⬇ Exportar CSV</button>
+            </article>
+
+            <article class="report-type-card">
+              <div class="report-type-icon" style="background:#fff4df">📍</div>
+              <div class="report-type-body">
+                <h3>Resumo por Local</h3>
+                <p>Total acumulado por ponto de coleta no período selecionado.</p>
+              </div>
+              <button class="primary-btn" data-report="local">⬇ Exportar CSV</button>
+            </article>
+
+            <article class="report-type-card">
+              <div class="report-type-icon" style="background:#fdebec">♻️</div>
+              <div class="report-type-body">
+                <h3>Destinação dos Resíduos</h3>
+                <p>Totais agrupados por tipo de destinação (reciclagem, aterro, etc.).</p>
+              </div>
+              <button class="primary-btn" data-report="destinacao">⬇ Exportar CSV</button>
+            </article>
+
+          </div>
         </section>
 
       </section>
