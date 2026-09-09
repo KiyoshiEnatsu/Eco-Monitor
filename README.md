@@ -1,4 +1,4 @@
-# 🍃 EcoMonitor
+# 🍃 EcoMonitor — MVP v1.0
 
 Sistema web de monitoramento de resíduos sólidos desenvolvido como MVP para instituições de ensino. Permite registrar, visualizar e exportar dados de pesagens de resíduos com foco em sustentabilidade e na ODS 13 da ONU.
 
