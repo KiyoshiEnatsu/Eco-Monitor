@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoMonitor | Monitoramento de Resíduos</title>
+
+  <!-- Pré-conexão com o Google Fonts para melhorar performance de carregamento -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Fonte Inter usada em toda a interface -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Estilos da aplicação -->
+  <link rel="stylesheet" href="style.css">
+
+  <!--
+    AO INTEGRAR COM SUPABASE:
+    Adicionar aqui o SDK do Supabase antes do app.js:
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  -->
+</head>
+<body>
+
+  <!-- Estrutura principal da aplicação (layout de duas colunas: sidebar + main) -->
+  <div class="app-shell">
+
+    <!-- ============================================================
+         SIDEBAR — menu lateral de navegação
+         Permanece igual após migração. Navegação é 100% front-end.
+         ============================================================ -->
+    <aside class="sidebar" id="sidebar">
+
+      <!-- Logo e nome da aplicação -->
+      <div class="brand">
+        <div class="brand-icon">🍃</div>
+        <div>
+          <strong>EcoMonitor</strong>
+          <span>Resíduos hoje, um futuro melhor</span>
+        </div>
+      </div>
+
+      <!-- Itens de navegação
+           data-section: valor usado em app.js pela função navigate() para trocar a página ativa -->
+      <nav class="nav">
+        <button class="nav-item active" data-section="dashboard">⌂ <span>Dashboard</span></button>
+        <button class="nav-item" data-section="pesagem">＋ <span>Nova Pesagem</span></button>
+        <button class="nav-item" data-section="historico">◷ <span>Histórico</span></button>
+        <button class="nav-item" data-section="locais">⌖ <span>Locais</span></button>
+        <button class="nav-item" data-section="relatorios">▣ <span>Relatórios</span></button>
+      </nav>
+
+      <!-- Card informativo no rodapé da sidebar (ODS 13) -->
+      <div class="sidebar-bottom">
+        <div class="ods-card">
+          <div class="ods-leaf">🌎</div>
+          <strong>ODS 13</strong>
+          <span>Ação contra a Mudança Global do Clima</span>
+          <small>Pequenas atitudes geram grandes impactos.</small>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============================================================
+         ÁREA PRINCIPAL — topbar + conteúdo das seções
+         ============================================================ -->
+    <main class="main">
+
+      <!-- Barra superior com menu hamburguer (mobile), notificações e perfil do usuário -->
+      <header class="topbar">
+        <!-- Botão que abre/fecha a sidebar em telas pequenas (controlado em app.js) -->
+        <button class="menu-btn" id="menuBtn">☰</button>
+        <div class="topbar-spacer"></div>
+        <!-- Ícone de notificações (funcionalidade futura) -->
+        <button class="icon-btn" title="Notificações">🔔</button>
+        <!-- Chip do usuário logado
+             No Supabase: substituir "KE" e "Kayo Eduardo" pelos dados de supabase.auth.getUser() -->
+        <div class="user-chip">
+          <div class="avatar">KE</div>
+          <span>Kayo Eduardo</span>
+          <span>⌄</span>
+        </div>
+      </header>
+
+      <!-- Área de conteúdo — cada <section class="page"> é uma tela da aplicação.
+           Apenas a seção com class "active" fica visível (controlado por navigate() em app.js) -->
+      <section class="content">
+
+        <!-- ============================================================
+             SEÇÃO: DASHBOARD
+             id="section-dashboard" — referenciado em navigate() no app.js
+             ============================================================ -->
+        <section id="section-dashboard" class="page active">
+          <div class="page-header">
+            <div>
+              <!-- No Supabase: substituir "Kayo" pelo nome do usuário autenticado -->
+              <h1>Olá, Kayo!</h1>
+              <p>Aqui está o resumo da geração de resíduos da sua instituição.</p>
+            </div>
+
+            <!-- Filtros do dashboard — ao mudar, disparam renderDashboard() via app.js -->
+            <div class="filters">
+              <!-- Filtro de período: valor em dias ou "all". Lido por filteredData() em app.js -->
+              <select id="periodFilter">
+                <option value="30">Últimos 30 dias</option>
+                <option value="90">Últimos 90 dias</option>
+                <option value="all">Todo o período</option>
+              </select>
+              <!-- Filtro de local: populado dinamicamente por populateLocationSelects() em app.js
+                   No Supabase: opções virão da tabela "locais" -->
+              <select id="locationFilter"></select>
+            </div>
+          </div>
+
+          <!-- Cards de métricas — valores preenchidos por renderDashboard() em app.js -->
+          <div class="cards-grid">
+
+            <!-- Card: total de resíduos no período -->
+            <article class="metric-card">
+              <div class="metric-icon green">🗑️</div>
+              <div>
+                <span>Total de resíduos</span>
+                <strong id="metricTotal">0 kg</strong>           <!-- atualizado por renderDashboard() -->
+                <small id="metricTotalNote">Sem dados ainda</small> <!-- ex.: "15 pesagens registradas" -->
+              </div>
+            </article>
+
+            <!-- Card: total de resíduos com destinação sustentável (reciclagem, compostagem, reutilização) -->
+            <article class="metric-card">
+              <div class="metric-icon blue">♻️</div>
+              <div>
+                <span>Recicláveis</span>
+                <strong id="metricRecycle">0 kg</strong>
+                <small id="metricRecyclePct">0% do total</small>
+              </div>
+            </article>
+
+            <!-- Card: total de resíduos não recicláveis (aterro/rejeito e outros) -->
+            <article class="metric-card">
+              <div class="metric-icon orange">🍂</div>
+              <div>
+                <span>Não recicláveis</span>
+                <strong id="metricNonRecycle">0 kg</strong>
+                <small id="metricNonRecyclePct">0% do total</small>
+              </div>
+            </article>
+
+            <!-- Card: média diária de resíduos no período selecionado -->
+            <article class="metric-card">
+              <div class="metric-icon mint">🌱</div>
+              <div>
+                <span>Média diária</span>
+                <strong id="metricDaily">0 kg</strong>
+                <small id="metricDailyNote">no período</small>
+              </div>
+            </article>
+          </div>
+
+          <!-- Grade de painéis com gráficos e tabelas -->
+          <div class="dashboard-grid">
+
+            <!-- Painel: gráfico de barras por categoria de resíduo
+                 Preenchido por renderBars() em app.js -->
+            <article class="panel large">
+              <div class="panel-header">
+                <div>
+                  <h2>Geração de resíduos por categoria</h2>
+                  <p>Quantidade acumulada no período</p>
+                </div>
+              </div>
+              <!-- Container das barras — innerHTML gerado dinamicamente em renderBars() -->
+              <div id="categoryChart" class="bar-chart"></div>
+            </article>
+
+            <!-- Painel: gráfico de rosca (donut) com composição percentual
+                 Preenchido por renderDonut() em app.js -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Composição dos resíduos</h2>
+                  <p>Distribuição percentual</p>
+                </div>
+              </div>
+              <div class="donut-wrap">
+                <!-- O fundo do donut é um conic-gradient aplicado via JS em renderDonut() -->
+                <div class="donut" id="donutChart">
+                  <div class="donut-center">
+                    <strong id="donutTotal">0</strong> <!-- total em kg no centro do donut -->
+                    <span>kg total</span>
+                  </div>
+                </div>
+                <!-- Legenda de cores do donut — gerada por renderDonut() -->
+                <div class="legend" id="donutLegend"></div>
+              </div>
+            </article>
+
+            <!-- Painel: gráfico de linha com evolução semanal/mensal
+                 Preenchido por renderTrend() em app.js -->
+            <article class="panel large">
+              <div class="panel-header">
+                <div>
+                  <h2>Evolução da geração de resíduos</h2>
+                  <!-- Subtítulo atualizado ao alternar semanal/mensal -->
+                  <p id="trendSubtitle">Pesagens registradas por semana</p>
+                </div>
+                <!-- Botões de alternância semanal/mensal
+                     data-trend: lido pelo event listener em app.js -->
+                <div class="segmented">
+                  <button class="active" data-trend="weekly">Semanal</button>
+                  <button data-trend="monthly">Mensal</button>
+                </div>
+              </div>
+              <!-- SVG do gráfico de linha gerado por renderTrend() -->
+              <div id="trendChart" class="line-chart"></div>
+            </article>
+
+            <!-- Painel: insights automáticos gerados a partir dos dados
+                 Preenchido por renderInsights() em app.js -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Insights e recomendações</h2>
+                  <p>Observações geradas a partir dos seus dados</p>
+                </div>
+              </div>
+              <div id="insights" class="insights"></div>
+            </article>
+
+            <!-- Painel: tabela com as 5 pesagens mais recentes
+                 Preenchido por renderRecent() em app.js
+                 No Supabase: query com .order("date", {ascending:false}).limit(5) -->
+            <article class="panel large">
+              <div class="panel-header">
+                <div><h2>Últimas pesagens</h2><p>Registros mais recentes</p></div>
+                <!-- data-go: atalho de navegação, lido pelo event listener global em app.js -->
+                <button class="link-btn" data-go="historico">Ver histórico</button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Local</th>
+                      <th>Resíduo</th>
+                      <th>Peso (kg)</th>
+                      <th>Destinação</th>
+                    </tr>
+                  </thead>
+                  <!-- Linhas geradas dinamicamente por renderRecent() -->
+                  <tbody id="recentTable"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <!-- Painel: barras horizontais de resíduos por local
+                 Preenchido por renderLocationBars() em app.js -->
+            <article class="panel">
+              <div class="panel-header">
+                <div><h2>Resíduos por local</h2><p>Total acumulado</p></div>
+              </div>
+              <div id="locationBars" class="location-bars"></div>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- ============================================================
+             SEÇÃO: NOVA PESAGEM
+             id="section-pesagem" — referenciado em navigate() no app.js
+             Formulário ouvido por "weighingForm" submit listener em app.js
+             No Supabase: submit fará INSERT na tabela "pesagens"
+             ============================================================ -->
+        <section id="section-pesagem" class="page">
+          <div class="page-header">
+            <div>
+              <h1>Nova Pesagem</h1>
+              <p>Registre uma nova medição de resíduos.</p>
+            </div>
+          </div>
+
+          <article class="form-card">
+            <form id="weighingForm">
+              <div class="form-grid">
+
+                <!-- Campo: data da pesagem — pré-preenchido com hoje via app.js -->
+                <label>Data
+                  <input type="date" id="date" required>
+                </label>
+
+                <!-- Campo: local da pesagem — populado por populateLocationSelects() em app.js
+                     No Supabase: opções virão da tabela "locais" (id + name) -->
+                <label>Local
+                  <select id="local" required></select>
+                </label>
+
+                <!-- Campo: tipo de resíduo — valores fixos, sem necessidade de tabela no banco -->
+                <label>Tipo de resíduo
+                  <select id="wasteType" required>
+                    <option value="">Selecione...</option>
+                    <option>Orgânico</option>
+                    <option>Plástico</option>
+                    <option>Papel</option>
+                    <option>Metal</option>
+                    <option>Vidro</option>
+                    <option>Rejeitos</option>
+                  </select>
+                </label>
+
+                <!-- Campo: peso em kg — valor numérico com 2 casas decimais -->
+                <label>Peso (kg)
+                  <input type="number" id="weight" min="0.01" step="0.01" placeholder="Ex.: 4,5" required>
+                </label>
+
+                <!-- Campo: destinação do resíduo — valores fixos -->
+                <label>Destinação
+                  <select id="destination" required>
+                    <option value="">Selecione...</option>
+                    <option>Reciclagem</option>
+                    <option>Compostagem</option>
+                    <option>Reutilização</option>
+                    <option>Aterro / rejeito</option>
+                    <option>Outro</option>
+                  </select>
+                </label>
+
+                <!-- Campo: observação livre (opcional) — coluna "notes" na tabela "pesagens" -->
+                <label class="full">Observação
+                  <textarea id="notes" rows="4" placeholder="Ex.: pesagem da coleta semanal da cantina"></textarea>
+                </label>
+
+              </div>
+              <div class="form-actions">
+                <!-- Botão limpar — ouvido por "clearForm" click listener em app.js -->
+                <button type="button" class="secondary-btn" id="clearForm">Limpar</button>
+                <!-- Botão salvar — dispara o submit listener do formulário em app.js -->
+                <button type="submit" class="primary-btn">Salvar pesagem</button>
+              </div>
+            </form>
+          </article>
+
+          <!-- Dica informativa — conteúdo estático, sem relação com o banco -->
+          <div class="tip-box">
+            <strong>💡 Dica</strong>
+            <span>Faça as pesagens sempre no mesmo dia e horário para melhorar a comparação entre semanas.</span>
+          </div>
+        </section>
+
+        <!-- ============================================================
+             SEÇÃO: HISTÓRICO
+             id="section-historico" — referenciado em navigate() no app.js
+             Tabela preenchida por renderHistory() em app.js
+             No Supabase: query com filtros dinâmicos via .ilike(), .eq()
+             ============================================================ -->
+        <section id="section-historico" class="page">
+          <div class="page-header">
+            <div>
+              <h1>Histórico</h1>
+              <p>Consulte, filtre e remova registros de pesagens.</p>
+            </div>
+            <button class="primary-btn" data-go="pesagem">＋ Nova pesagem</button>
+          </div>
+
+          <article class="panel">
+            <!-- Linha de filtros — cada campo dispara renderHistory() via listeners em app.js -->
+            <div class="filter-row">
+              <!-- Busca por texto: filtra por nome do local ou tipo de resíduo -->
+              <input id="searchHistory" type="search" placeholder="🔎 Buscar por local ou resíduo...">
+
+              <!-- Filtro por tipo de resíduo -->
+              <select id="historyType">
+                <option value="">Todos os resíduos</option>
+                <option>Orgânico</option>
+                <option>Plástico</option>
+                <option>Papel</option>
+                <option>Metal</option>
+                <option>Vidro</option>
+                <option>Rejeitos</option>
+              </select>
+
+              <!-- Filtro por local — populado por populateLocationSelects() em app.js
+                   No Supabase: opções virão da tabela "locais" -->
+              <select id="historyLocation"></select>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Local</th>
+                    <th>Resíduo</th>
+                    <th>Peso</th>
+                    <th>Destinação</th>
+                    <th>Ações</th> <!-- coluna com botão de excluir -->
+                  </tr>
+                </thead>
+                <!-- Linhas geradas por renderHistory()
+                     Cada linha tem um botão data-delete="id" ouvido pelo listener global em app.js
+                     No Supabase: exclusão via supabase.from("pesagens").delete().eq("id", id) -->
+                <tbody id="historyTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <!-- ============================================================
+             SEÇÃO: LOCAIS DE COLETA
+             id="section-locais" — referenciado em navigate() no app.js
+             Cards preenchidos por renderLocations() em app.js
+             Formulário ouvido por "locationForm" submit listener em app.js
+             No Supabase: INSERT na tabela "locais", SELECT para listar
+             ============================================================ -->
+        <section id="section-locais" class="page">
+          <div class="page-header">
+            <div>
+              <h1>Locais de coleta</h1>
+              <p>Cadastre os pontos onde as pesagens são realizadas.</p>
+            </div>
+          </div>
+
+          <article class="panel">
+            <!-- Formulário de cadastro de novo local
+                 No Supabase: submit fará INSERT na tabela "locais" com { name, type } -->
+            <form id="locationForm" class="location-form">
+              <!-- Nome do local — coluna "name" na tabela "locais" -->
+              <input id="newLocation" type="text" placeholder="Nome do local (ex.: Cantina)" required>
+              <!-- Tipo do local — coluna "type" na tabela "locais" -->
+              <select id="locationType">
+                <option>Instituição de ensino</option>
+                <option>Residência</option>
+              </select>
+              <button class="primary-btn" type="submit">＋ Adicionar</button>
+            </form>
+          </article>
+
+          <!-- Cards dos locais cadastrados — gerados por renderLocations() em app.js
+               Cada card exibe nome, tipo, total de kg e quantidade de pesagens -->
+          <div id="locationCards" class="location-cards"></div>
+        </section>
+
+        <!-- ============================================================
+             SEÇÃO: RELATÓRIOS
+             id="section-relatorios" — referenciado em navigate() no app.js
+             Botão de exportação ouvido por "exportCsv" click listener em app.js
+             No Supabase: exportCsv() buscará todos os dados antes de gerar o arquivo
+             ============================================================ -->
+        <section id="section-relatorios" class="page">
+          <div class="page-header">
+            <div>
+              <h1>Relatórios</h1>
+              <p>Exporte os registros para análise posterior.</p>
+            </div>
+          </div>
+
+          <article class="panel report-panel">
+            <div class="report-icon">📊</div>
+            <h2>Exportação de dados</h2>
+            <p>Baixe todos os registros em CSV para usar no Excel, Power BI ou outro sistema de análise.</p>
+            <!-- Botão de exportar CSV — ouvido por exportCsv() em app.js -->
+            <button class="primary-btn" id="exportCsv">⬇ Exportar CSV</button>
+          </article>
+        </section>
+
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast de notificação — exibido por showToast() em app.js
+       Aparece brevemente na tela para confirmar ações do usuário -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Script principal da aplicação
+       No Supabase: adicionar o SDK antes deste script e inicializar o client:
+       const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) -->
+  <script src="app.js"></script>
+</body>
+</html>
