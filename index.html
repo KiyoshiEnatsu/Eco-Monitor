@@ -467,45 +467,17 @@
           <div class="page-header">
             <div>
               <h1>Relatórios</h1>
-              <p>Gere relatórios em PDF ou exporte os dados em CSV.</p>
+              <p>Exporte os registros para análise posterior.</p>
             </div>
           </div>
 
-          <!-- Filtros compartilhados entre PDF e CSV -->
-          <article class="panel" style="margin-bottom:20px">
-            <div class="filter-row">
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:500">
-                Data início
-                <input type="date" id="relatorioInicio">
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:500">
-                Data fim
-                <input type="date" id="relatorioFim">
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:500">
-                Local
-                <select id="relatorioLocal"><option value="">Todos os locais</option></select>
-              </label>
-            </div>
+          <article class="panel report-panel">
+            <div class="report-icon">📊</div>
+            <h2>Exportação de dados</h2>
+            <p>Baixe todos os registros em CSV para usar no Excel, Power BI ou outro sistema de análise.</p>
+            <!-- Botão de exportar CSV — ouvido por exportCsv() em app.js -->
+            <button class="primary-btn" id="exportCsv">⬇ Exportar CSV</button>
           </article>
-
-          <div style="display:flex;gap:16px;flex-wrap:wrap">
-
-            <article class="panel report-panel" style="flex:1;min-width:220px">
-              <div class="report-icon">📄</div>
-              <h2>Relatório PDF</h2>
-              <p>Relatório completo com gráficos, indicadores e recomendações.</p>
-              <button class="primary-btn" id="exportPdf">⬇ Gerar PDF</button>
-            </article>
-
-            <article class="panel report-panel" style="flex:1;min-width:220px">
-              <div class="report-icon">📊</div>
-              <h2>Exportação CSV</h2>
-              <p>Dados brutos para uso no Excel, Power BI ou outro sistema.</p>
-              <button class="primary-btn" id="exportCsv">⬇ Exportar CSV</button>
-            </article>
-
-          </div>
         </section>
 
       </section>

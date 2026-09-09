@@ -38,7 +38,6 @@ async function fetchAll() {
   data = (pesagens || []).map(x => ({ ...x, locationId: x.location_id }));
   populateLocationSelects();
   populateAmbienteSelects();
-  populateRelatorioLocal();
   renderDashboard();
   renderLocations();
   renderAmbientes();
@@ -387,46 +386,19 @@ function resetLocationForm() {
 }
 
 // ============================================================
-// RELATÓRIOS — chamadas para a API Python (Flask porta 5000)
+// EXPORTAÇÃO CSV
 // ============================================================
-const API = "http://localhost:5000";
-
-function relatorioParams() {
-  const inicio = document.getElementById("relatorioInicio").value;
-  const fim    = document.getElementById("relatorioFim").value;
-  const local  = document.getElementById("relatorioLocal").value;
-  const p = new URLSearchParams();
-  if (inicio) p.set("inicio", inicio);
-  if (fim)    p.set("fim",    fim);
-  if (local)  p.set("local",  local);
-  return p.toString();
-}
-
-function downloadFromApi(endpoint, nomeArquivo) {
-  const params = relatorioParams();
-  const url    = `${API}${endpoint}${params ? "?"+params : ""}`;
-  showToast("Gerando arquivo, aguarde...");
-  fetch(url)
-    .then(r => {
-      if (!r.ok) throw new Error();
-      return r.blob();
-    })
-    .then(blob => {
-      const a    = document.createElement("a");
-      a.href     = URL.createObjectURL(blob);
-      a.download = nomeArquivo;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      showToast("Arquivo gerado com sucesso!");
-    })
-    .catch(() => showToast("Erro ao conectar com a API. Verifique se o servidor Python está rodando."));
-}
-
-function populateRelatorioLocal() {
-  const sel = document.getElementById("relatorioLocal");
-  if (!sel) return;
-  sel.innerHTML = `<option value="">Todos os locais</option>`;
-  locations.forEach(l => sel.innerHTML += `<option value="${l.id}">${l.name}</option>`);
+function exportCsv() {
+  const header = ["id","data","local","tipo_residuo","peso_kg","destinacao","observacao"];
+  const rows   = data.map(x => [x.id, x.date, getLocation(x.locationId), x.type, x.weight, x.destination, (x.notes||"")]);
+  const csv    = [header,...rows].map(row => row.map(v => `"${String(v).replaceAll('"','""')}"`).join(";")).join("\n");
+  const blob   = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8"});
+  const a      = document.createElement("a");
+  a.href       = URL.createObjectURL(blob);
+  a.download   = "ecomonitor_pesagens.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast("CSV exportado com sucesso!");
 }
 
 // ============================================================
@@ -624,12 +596,7 @@ document.getElementById("ambienteForm").addEventListener("submit", async e => {
 });
 
 document.getElementById("cancelEditAmbiente").addEventListener("click", resetAmbienteForm);
-document.getElementById("exportPdf").addEventListener("click", () =>
-  downloadFromApi("/relatorio/pdf", `ecomonitor_relatorio_${new Date().toISOString().slice(0,10)}.pdf`)
-);
-document.getElementById("exportCsv").addEventListener("click", () =>
-  downloadFromApi("/relatorio/csv", `ecomonitor_pesagens_${new Date().toISOString().slice(0,10)}.csv`)
-);
+document.getElementById("exportCsv").addEventListener("click", exportCsv);
 
 // ============================================================
 // INICIALIZAÇÃO — carrega dados do Supabase e renderiza

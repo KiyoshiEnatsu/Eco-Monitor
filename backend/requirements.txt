@@ -1,7 +1,0 @@
-flask
-flask-cors
-supabase
-pandas
-matplotlib
-xhtml2pdf
-python-dotenv
